@@ -1,0 +1,60 @@
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: redis-memory-optimized
+spec:
+  description: "Memory-tuned class for Redis. AMD c4d preferred, all-Gen-4 (Hyperdisk), On-Demand only, THP off."
+  nodePoolAutoCreation:
+    enabled: true
+  nodePoolConfig:
+    imageStreaming:
+      enabled: true
+    gvnic:
+      enabled: true
+  priorityDefaults:
+    location:
+      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c']
+    nodeSystemConfig:
+      linuxNodeConfig:
+        sysctls:
+          net.core.somaxconn: "1024"
+        transparentHugepageEnabled: TRANSPARENT_HUGEPAGE_ENABLED_NEVER
+  priorities:
+  # 1. c4d — Gen 4 AMD, strong price/perf, Hyperdisk-only
+  - machineFamily: c4d
+    minCores: 8
+    minMemoryGb: 64
+    spot: false
+    storage:
+      bootDiskType: hyperdisk-balanced
+      bootDiskSize: 50
+
+  # 2. c4 — Gen 4 Intel fallback (broader availability than c4d)
+  - machineFamily: c4
+    minCores: 8
+    minMemoryGb: 64
+    spot: false
+    storage:
+      bootDiskType: hyperdisk-balanced
+      bootDiskSize: 50
+
+  # 3. n4 — Gen 4 general-purpose, widest Gen-4 availability
+  - machineFamily: n4
+    minCores: 8
+    minMemoryGb: 64
+    spot: false
+    storage:
+      bootDiskType: hyperdisk-balanced
+      bootDiskSize: 50
+
+  # 4. Last resort: widen zone net on n4
+  - machineFamily: n4
+    minCores: 8
+    minMemoryGb: 64
+    spot: false
+    location:
+      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c', 'us-central1-f']
+      locationPolicy: ANY
+    storage:
+      bootDiskType: hyperdisk-balanced
+  whenUnsatisfiable: ScaleUpAnyway

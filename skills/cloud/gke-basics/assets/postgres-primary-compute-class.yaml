@@ -1,0 +1,55 @@
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: postgres-primary
+spec:
+  description: "Primary Postgres node, zone-pinned for PV affinity. Reservation-first, On-Demand fallback, all-Gen-4 (Hyperdisk), no Spot."
+  nodePoolAutoCreation:
+    enabled: true
+  nodePoolConfig:
+    imageStreaming:
+      enabled: true
+    gvnic:
+      enabled: true
+  priorityDefaults:
+    location:
+      zones: ['us-central1-a']    # pin to PV zone — primary uses zonal disk
+    nodeSystemConfig:
+      linuxNodeConfig:
+        sysctls:
+          net.core.somaxconn: "1024"
+          vm.overcommit_memory: "2"   # strict — prevents OOM-killer surprises on large queries
+        transparentHugepageEnabled: TRANSPARENT_HUGEPAGE_ENABLED_NEVER
+  priorities:
+  # 1. Specific reservation — pre-paid, highest obtainability
+  - machineFamily: n4
+    minCores: 16
+    minMemoryGb: 128
+    spot: false
+    reservations:
+      affinity: Specific
+      specific:
+      - name: postgres-primary-reservation
+    storage:
+      bootDiskType: hyperdisk-balanced
+      bootDiskSize: 100
+
+  # 2. On-Demand n4 highmem in same zone
+  - machineFamily: n4
+    minCores: 16
+    minMemoryGb: 128
+    spot: false
+    storage:
+      bootDiskType: hyperdisk-balanced
+      bootDiskSize: 100
+
+  # 3. c4 fallback (still Gen 4, Hyperdisk-compatible) in same zone
+  - machineFamily: c4
+    minCores: 16
+    minMemoryGb: 128
+    spot: false
+    storage:
+      bootDiskType: hyperdisk-balanced
+      bootDiskSize: 100
+
+  whenUnsatisfiable: ScaleUpAnyway

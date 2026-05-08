@@ -151,7 +151,7 @@ spec:
 
 ### Spot VMs for Batch
 
-Batch workloads are ideal Spot VM candidates (interruptible, can checkpoint). Use a ComputeClass with Spot-first priority and `activeMigration` to return to Spot when available. See [gke-compute-classes.md](./gke-compute-classes.md) for the Spot-with-fallback pattern.
+Batch workloads are ideal Spot VM candidates (interruptible, can checkpoint). Use a ComputeClass with Spot-first priority and `activeMigration` to return to Spot when available. See [gke-compute-classes-optimize.md](./gke-compute-classes-optimize.md) for the Spot-with-fallback pattern.
 
 ### Scale-to-Zero
 

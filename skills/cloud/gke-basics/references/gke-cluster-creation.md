@@ -118,7 +118,7 @@ gcloud container clusters create-auto <CLUSTER_NAME> \
   --enable-private-nodes --enable-master-authorized-networks \
   --enable-dns-access --enable-secret-manager --scoped-rbs-bindings
 
-# 2. Apply GPU ComputeClass (see gke-compute-classes.md)
+# 2. Apply GPU ComputeClass (see gke-compute-classes-create.md / -optimize.md)
 kubectl apply -f gpu-compute-class.yaml
 
 # 3. Or use GIQ for inference (see gke-inference.md)

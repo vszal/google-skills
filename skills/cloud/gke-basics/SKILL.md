@@ -33,7 +33,9 @@ Load the relevant reference based on trigger keywords. Prefer the most specific 
 | Networking | private cluster, VPC, subnet, Gateway API, DNS, ingress, egress, datapath | [gke-networking.md](./references/gke-networking.md) |
 | Security & IAM | Workload Identity, Secret Manager, RBAC, Binary Auth, hardening, audit, gVisor, IAM roles | [gke-security.md](./references/gke-security.md) |
 | Scaling | HPA, VPA, autoscaler, autoscaling, NAP, scale pods, scale nodes | [gke-scaling.md](./references/gke-scaling.md) |
-| Compute Classes | ComputeClass, machine family, Spot fallback, GPU node pool, node selection | [gke-compute-classes.md](./references/gke-compute-classes.md) |
+| Compute Classes — Create | create ComputeClass, define ComputeClass, CCC YAML, manual node pool binding, NAC vs manual | [gke-compute-classes-create.md](./references/gke-compute-classes-create.md) |
+| Compute Classes — Optimize | priority list, fallback, Spot strategy, GPU/TPU obtainability, consolidation, activeMigration, DWS FlexStart | [gke-compute-classes-optimize.md](./references/gke-compute-classes-optimize.md) |
+| Compute Classes — Debug | ComputeClass status, scale-up failure, stockout, autoscaler visibility logs, scheduling conflict, pending pods | [gke-compute-classes-debug.md](./references/gke-compute-classes-debug.md) |
 | Cost | cost, savings, Spot VMs, rightsizing, CUD, optimize spend, budget | [gke-cost.md](./references/gke-cost.md) |
 | AI/ML Inference | inference, model serving, LLM, GPU, TPU, GIQ, vLLM | [gke-inference.md](./references/gke-inference.md) |
 | Upgrades | upgrade, maintenance window, release channel, patching, version | [gke-upgrades.md](./references/gke-upgrades.md) |
