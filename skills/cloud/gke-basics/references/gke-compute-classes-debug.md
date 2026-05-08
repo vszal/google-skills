@@ -32,6 +32,12 @@ kubectl get computeclass <CLASS-NAME> -o yaml
 
 Look at `status.conditions[].reason` and `.message` — these surface invalid spec, NAC permission issues, and unsupported field combinations directly.
 
+Common config errors and their fixes:
+
+| Error message | Cause | Fix |
+|---------------|-------|-----|
+| `compute-class <name> contains priorities using location config with specific reservations enabled` | A priority with `reservations.affinity: Specific` has a `location` block, either set per-priority or inherited from `priorityDefaults.location` | Omit `location` on the reservation priority. Put the reservation's zonal scope in `reservations.specific[].zones`, and set `location.zones` per-priority only on the non-reservation entries. |
+
 ## Scale-up failures (stockout, quota, exhaustion)
 
 When pods stay `Pending` and no node arrives, the answer is in **cluster autoscaler visibility logs** ([docs](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cluster-autoscaler-visibility)).

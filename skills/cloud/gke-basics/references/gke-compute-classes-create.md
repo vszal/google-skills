@@ -148,6 +148,8 @@ spec:
 
 > **Gotcha (stateful workloads):** Disk generation is a *create-time* constraint that's painful to fix later. Gen 4 VMs (`n4`, `c4`, `c4a`, `c4d`) require **Hyperdisk**; Gen 2 VMs (`n2`, `n2d`, `c2`, `c2d`, `m1`, `m2`) require **Persistent Disk**. If your workload has attached PVs, every priority in the list must use the same disk generation as those PVs — otherwise volume attach fails on the wrong-gen fallback. Boot disks aren't affected. Set `storage.bootDiskType` explicitly per priority (or in `priorityDefaults`) to make this intent visible. See [gke-compute-classes-debug.md](./gke-compute-classes-debug.md) for symptoms.
 
+> **Gotcha (Specific reservation + location):** Don't set `priorityDefaults.location` when any priority uses `reservations.affinity: Specific`. The default propagates to the reservation priority and conflicts with the reservation's own zonal scope, surfacing as `compute-class <name> contains priorities using location config with specific reservations enabled`. Fix: omit `priorityDefaults.location` and instead (a) set `reservations.specific[].zones` on the reservation priority to scope it to the reservation's actual zone(s), and (b) set `location.zones` per-priority on the non-reservation entries. This rule applies to per-priority `location` on a Specific-reservation priority too — not just the default.
+
 ## Where to go next
 
 - Designing the priority list, fallback strategy, GPU/TPU patterns: [gke-compute-classes-optimize.md](./gke-compute-classes-optimize.md)

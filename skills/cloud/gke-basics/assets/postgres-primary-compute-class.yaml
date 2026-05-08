@@ -11,9 +11,11 @@ spec:
       enabled: true
     gvnic:
       enabled: true
+  # NOTE: priorityDefaults.location omitted — it would conflict with the
+  # Specific reservation on priority 1. Reservation zone scope lives in
+  # reservations.specific[].zones; non-reservation priorities set
+  # location.zones explicitly.
   priorityDefaults:
-    location:
-      zones: ['us-central1-a']    # pin to PV zone — primary uses zonal disk
     nodeSystemConfig:
       linuxNodeConfig:
         sysctls:
@@ -30,15 +32,18 @@ spec:
       affinity: Specific
       specific:
       - name: postgres-primary-reservation
+        zones: ['us-central1-a']    # zonal scope lives here for the reservation entry
     storage:
       bootDiskType: hyperdisk-balanced
       bootDiskSize: 100
 
-  # 2. On-Demand n4 highmem in same zone
+  # 2. On-Demand n4 highmem in same zone (PV affinity)
   - machineFamily: n4
     minCores: 16
     minMemoryGb: 128
     spot: false
+    location:
+      zones: ['us-central1-a']
     storage:
       bootDiskType: hyperdisk-balanced
       bootDiskSize: 100
@@ -48,6 +53,8 @@ spec:
     minCores: 16
     minMemoryGb: 128
     spot: false
+    location:
+      zones: ['us-central1-a']
     storage:
       bootDiskType: hyperdisk-balanced
       bootDiskSize: 100

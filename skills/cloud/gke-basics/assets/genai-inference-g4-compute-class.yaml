@@ -11,9 +11,10 @@ spec:
       enabled: true
     gvnic:
       enabled: true
-  priorityDefaults:
-    location:
-      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c']
+  # NOTE: no priorityDefaults.location — it would conflict with the Specific
+  # reservation on priority 1. location is set per-priority on the non-
+  # reservation entries below; the reservation priority's zone scope comes
+  # from reservations.specific[].zones.
   priorities:
   # 1. Specific reservation — paid, no queue, no preemption
   - gpu:
@@ -26,7 +27,7 @@ spec:
       affinity: Specific
       specific:
       - name: g4-inference-reservation
-        zones: ['us-central1-a']        # pin to the zone the reservation actually lives in
+        zones: ['us-central1-a']        # zonal scope lives here, not in priorityDefaults.location
 
   # 2. Spot — instant capacity, accept preemption (replicas mask it)
   - gpu:
@@ -35,6 +36,8 @@ spec:
       driverVersion: default
     machineType: g4-standard-48
     spot: true
+    location:
+      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c']
 
   # 3. DWS FlexStart — accept ~3min queue only if Spot is exhausted
   - flexStart:
@@ -45,6 +48,8 @@ spec:
       type: nvidia-rtx-pro-6000
       driverVersion: default
     machineType: g4-standard-48
+    location:
+      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c']
 
   # 4. On-Demand floor — guarantees a serving path
   - gpu:
@@ -53,3 +58,5 @@ spec:
       driverVersion: default
     machineType: g4-standard-48
     spot: false
+    location:
+      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c']
