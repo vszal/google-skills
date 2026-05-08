@@ -53,4 +53,3 @@ spec:
       bootDiskType: hyperdisk-balanced
       bootDiskSize: 100
 
-  whenUnsatisfiable: ScaleUpAnyway

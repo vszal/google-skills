@@ -1,0 +1,57 @@
+apiVersion: cloud.google.com/v1
+kind: ComputeClass
+metadata:
+  name: genai-inference-g4
+spec:
+  description: "G4 (NVIDIA RTX PRO 6000 Blackwell) inference serving. Reservation-first with instant Spot fallback, DWS only if Spot exhausted, On-Demand floor. Optimized for serving latency, not training throughput."
+  nodePoolAutoCreation:
+    enabled: true
+  nodePoolConfig:
+    imageStreaming:
+      enabled: true
+    gvnic:
+      enabled: true
+  priorityDefaults:
+    location:
+      zones: ['us-central1-a', 'us-central1-b', 'us-central1-c']
+  priorities:
+  # 1. Specific reservation — paid, no queue, no preemption
+  - gpu:
+      count: 1
+      type: nvidia-rtx-pro-6000
+      driverVersion: default
+    machineType: g4-standard-48
+    spot: false
+    reservations:
+      affinity: Specific
+      specific:
+      - name: g4-inference-reservation
+        zones: ['us-central1-a']        # pin to the zone the reservation actually lives in
+
+  # 2. Spot — instant capacity, accept preemption (replicas mask it)
+  - gpu:
+      count: 1
+      type: nvidia-rtx-pro-6000
+      driverVersion: default
+    machineType: g4-standard-48
+    spot: true
+
+  # 3. DWS FlexStart — accept ~3min queue only if Spot is exhausted
+  - flexStart:
+      enabled: true
+    capacityCheckWaitTimeSeconds: 1800
+    gpu:
+      count: 1
+      type: nvidia-rtx-pro-6000
+      driverVersion: default
+    machineType: g4-standard-48
+
+  # 4. On-Demand floor — guarantees a serving path
+  - gpu:
+      count: 1
+      type: nvidia-rtx-pro-6000
+      driverVersion: default
+    machineType: g4-standard-48
+    spot: false
+
+  whenUnsatisfiable: ScaleUpAnyway
