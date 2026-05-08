@@ -57,4 +57,3 @@ spec:
       locationPolicy: ANY
     storage:
       bootDiskType: hyperdisk-balanced
-  whenUnsatisfiable: ScaleUpAnyway

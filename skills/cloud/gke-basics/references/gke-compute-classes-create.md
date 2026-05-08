@@ -63,7 +63,9 @@ spec:
   - machineFamily: n4
     minCores: 16
     spot: false
-  whenUnsatisfiable: ScaleUpAnyway   # or DoNotScaleUp
+  # whenUnsatisfiable defaults to DoNotScaleUp — leave unset unless the
+  # workload genuinely accepts "any VM" as a fallback (rare; nginx-style
+  # stateless tiers). See table below.
 ```
 
 Common top-level fields:
@@ -76,7 +78,7 @@ Common top-level fields:
 | `priorities[]` | Ordered list of provisioning attempts |
 | `autoscalingPolicy` | Consolidation thresholds + delay |
 | `activeMigration` | Drift workloads back to higher priorities (see optimize doc) |
-| `whenUnsatisfiable` | `ScaleUpAnyway` or `DoNotScaleUp` if no priority matches |
+| `whenUnsatisfiable` | What happens when no priority is satisfiable. **Default: `DoNotScaleUp`** — appropriate for most workloads, since they have specific shape/accelerator/zone requirements. Set `ScaleUpAnyway` only when the workload genuinely accepts any-VM fallback (e.g. stateless web tier with HPA replicas). |
 
 Common per-priority fields:
 
@@ -117,7 +119,6 @@ spec:
     minCores: 16
   - machineFamily: e2
     minCores: 16
-  whenUnsatisfiable: ScaleUpAnyway
 ```
 
 Pod opts in via:

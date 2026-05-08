@@ -47,5 +47,3 @@ spec:
         maxSharedClientsPerGPU: 4
     machineType: g2-standard-8
     spot: false
-
-  whenUnsatisfiable: ScaleUpAnyway

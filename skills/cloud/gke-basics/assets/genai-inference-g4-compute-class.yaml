@@ -53,5 +53,3 @@ spec:
       driverVersion: default
     machineType: g4-standard-48
     spot: false
-
-  whenUnsatisfiable: ScaleUpAnyway
