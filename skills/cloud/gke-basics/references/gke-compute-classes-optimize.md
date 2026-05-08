@@ -10,7 +10,7 @@ Priorities are tried **top to bottom**. If an option is unobtainable (e.g. stock
 
 - **Cap at ~10 priorities.** Long lists may never reach the bottom — upper-tier backoffs expire and the list loops back to the top before lower priorities are tried.
 - **Don't repeat identical rules.** Repetition does not improve obtainability.
-- **Use `priorityScore` (GKE 1.35.2+) for ties.** Equal scores let GKE pick randomly instead of strictly sequential traversal. Doesn't reduce provisioning latency.
+- **Use `priorityScore` (GKE 1.35.2-gke.1842000+) for ties.** Integer 1–1000, higher = preferred. Same-score rules are evaluated together (not strictly sequentially); tie-break is by lowest unit cost. Doesn't reduce provisioning latency. Two hard constraints: (1) **max 3 rules per score**, (2) **if any rule has a score, all rules must** — partial scoring is rejected. See [`assets/equal-priority-tiebreak-compute-class.yaml`](../assets/equal-priority-tiebreak-compute-class.yaml).
 - **Tie-breaking on equal options** is by lowest unit cost (cluster autoscaler).
 
 ### Flexibility dimensions
@@ -40,6 +40,12 @@ If the user pins to a single family, suggest comparable substitutes. If they spe
 
 - Generally **don't cap VM upper bound.** The autoscaler optimizes bin packing — it won't randomly oversize.
 - For aggressive packing, set the cluster's `optimize-utilization` autoscaling profile.
+
+## Fallback timing
+
+Priority traversal is designed to **fast-fail** and move down the list to keep pod scheduling latency low. Actual fallback duration is **not deterministic**, though, and can be substantially longer with NAC: GKE may have to **create a node pool** before it can even test obtainability for that shape, and pool creation itself takes time. Each permutation NAC explores adds latency.
+
+For latency-sensitive workloads, put manual or pre-warmed pools at the top of the list (see Pattern 3) so the fast path doesn't depend on pool creation. Trim NAC-only priorities and avoid near-duplicates so traversal doesn't burn time on shapes that won't change the outcome.
 
 ## Provisioning model gotchas
 
