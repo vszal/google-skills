@@ -17,8 +17,8 @@ spec:
     nodeSystemConfig:
       linuxNodeConfig:
         sysctls:
-          net.core.somaxconn: "1024"
-          vm.overcommit_memory: "2"   # strict — prevents OOM-killer surprises on large queries
+          net.core.somaxconn: 1024
+          vm.overcommit_memory: 2   # strict — prevents OOM-killer surprises on large queries
         transparentHugepageEnabled: TRANSPARENT_HUGEPAGE_ENABLED_NEVER
   priorities:
   # 1. Specific reservation — pre-paid, highest obtainability
