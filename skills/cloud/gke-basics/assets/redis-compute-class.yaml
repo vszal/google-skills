@@ -17,7 +17,7 @@ spec:
     nodeSystemConfig:
       linuxNodeConfig:
         sysctls:
-          net.core.somaxconn: "1024"
+          net.core.somaxconn: 1024
         transparentHugepageEnabled: TRANSPARENT_HUGEPAGE_ENABLED_NEVER
   priorities:
   # 1. c4d — Gen 4 AMD, strong price/perf, Hyperdisk-only
