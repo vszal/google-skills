@@ -135,7 +135,7 @@ spec:
 - **Stateful broker (Kafka):** [`assets/kafka-broker-compute-class.yaml`](../assets/kafka-broker-compute-class.yaml) — multi-zone, `localSSDCount: 2` for page cache, `vm.max_map_count` and `fs.file-max` raised for many-segment workloads, Hyperdisk durable boot.
 - **Stateless, Spot-cost-optimized (nginx and similar):** [`assets/nginx-spot-hunt-compute-class.yaml`](../assets/nginx-spot-hunt-compute-class.yaml) — Spot-first hunt across mixed-generation families ordered by us-central1 cost, with `activeMigration` to drift back to cheaper Spot and an On-Demand floor at the bottom.
 - **GenAI inference (G4 / RTX PRO 6000 Blackwell):** [`assets/genai-inference-g4-compute-class.yaml`](../assets/genai-inference-g4-compute-class.yaml) — accelerator obtainability chain tuned for serving latency: reservation → Spot → DWS FlexStart → On-Demand. Note the Spot-before-DWS inversion vs. training-style chains (DWS's 3-min queue is unacceptable for online serving).
-- **Shared GPU inference (L4 with MPS):** [`assets/shared-l4-inference-compute-class.yaml`](../assets/shared-l4-inference-compute-class.yaml) — multi-tenant low-utilization inference with `gpuSharing.gpuSharingStrategy: MPS` and `maxSharedClientsPerGPU: 4`. Single- and dual-GPU shapes for bin-packing flexibility.
+- **Shared GPU inference (L4 with MPS):** [`assets/shared-l4-inference-compute-class.yaml`](../assets/shared-l4-inference-compute-class.yaml) — multi-tenant low-utilization inference with `gpuSharing.sharingStrategy: MPS` and `maxSharedClientsPerGPU: 4`. Single- and dual-GPU shapes for bin-packing flexibility.
 
 ## Selecting a CCC
 

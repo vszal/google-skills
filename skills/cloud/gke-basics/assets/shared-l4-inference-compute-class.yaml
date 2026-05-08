@@ -21,7 +21,7 @@ spec:
       type: nvidia-l4
       driverVersion: default
       gpuSharing:
-        gpuSharingStrategy: MPS
+        sharingStrategy: MPS
         maxSharedClientsPerGPU: 4
     machineType: g2-standard-8
     spot: true
@@ -32,7 +32,7 @@ spec:
       type: nvidia-l4
       driverVersion: default
       gpuSharing:
-        gpuSharingStrategy: MPS
+        sharingStrategy: MPS
         maxSharedClientsPerGPU: 4
     machineType: g2-standard-24
     spot: true
@@ -43,7 +43,7 @@ spec:
       type: nvidia-l4
       driverVersion: default
       gpuSharing:
-        gpuSharingStrategy: MPS
+        sharingStrategy: MPS
         maxSharedClientsPerGPU: 4
     machineType: g2-standard-8
     spot: false
