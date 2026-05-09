@@ -68,7 +68,7 @@ Tune `consolidationDelayMinutes` upward for workloads that scale up/down frequen
 
 ## ActiveMigration
 
-Reconciles running replicas back toward the top priorities (similar to Karpenter's drift). Throttling honors PDBs.
+Reconciles running replicas back toward the top priorities (similar to Karpenter's drift). Throttling honors PDBs — set a PDB on the workload to bound concurrent disruption during drift; without one, eviction is uncontrolled.
 
 ```yaml
 spec:
@@ -99,6 +99,7 @@ spec:
       specific:
       - name: nvidia-h200-141gb-specific
         reservationBlock: { name: nvidia-h200-141gb-block }
+        zones: ['us-central1-a']   # reservation is zonal — pin to avoid wasted backoff in other zones
     spot: false
   # 2. DWS FlexStart (queued, ~3 min minimum)
   - flexStart: { enabled: true }
@@ -113,6 +114,12 @@ spec:
     machineType: a3-ultragpu-8g
     spot: false
 ```
+
+> **Inference vs. training fallback order:** Pattern 1 is the *training-style* chain — DWS sits above Spot because training tolerates the ~3-min queue in exchange for longer-running, less-preempted capacity. For online inference / serving, **invert Spot and DWS**: Reserved → **Spot** → DWS → On-Demand. DWS's queue is incompatible with serving latency; Spot is instant, and replica count masks preemption. Worked example: [`assets/genai-inference-g4-compute-class.yaml`](../assets/genai-inference-g4-compute-class.yaml).
+
+> **Reservations are zonal — pin the zone.** A Specific reservation only exists in the zone(s) it was created in. Without `reservations.specific[].zones` (set on priority 1 above), the autoscaler may try the reservation in zones where it doesn't exist, burning backoff slots before falling through to lower priorities. Set `zones` on the reservation entry itself — don't try to express this with `priorityDefaults.location`, which collides with `Specific` (see [create-doc gotcha](./gke-compute-classes-create.md)).
+
+> **GPU sharing (multi-tenant inference):** For low-utilization workloads where multiple clients can share a GPU (dev/staging, batch eval, small-model APIs), a sharing strategy on the GPU priority packs more clients per node. Surface example: [`assets/shared-l4-inference-compute-class.yaml`](../assets/shared-l4-inference-compute-class.yaml) — MPS with 4 clients/GPU on L4. Strategy selection (MPS vs. time-slicing vs. MIG) is covered in a separate skill.
 
 ## Pattern 2 — Cost-optimized batch
 

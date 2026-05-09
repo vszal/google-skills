@@ -6,7 +6,7 @@ Authoring a ComputeClass (CCC): concepts, CRD basics, and starter examples. For 
 
 ## When to use ComputeClasses
 
-- Declarative node configuration + autoscaling priorities for GKE Autopilot, or Standard with Node Auto-Provisioning (NAP).
+- Declarative node configuration + autoscaling priorities for GKE Autopilot, or Standard with NodePoolAutoCreation (NAC) and/or manually created node pools.
 - Platform-level abstraction: shields app teams from infra details in podSpecs. Multiple CCCs per cluster; selected via nodeSelector/affinity, or as namespace/cluster default.
 - Common landing spot for users migrating from [Karpenter](https://karpenter.sh).
 
@@ -131,28 +131,42 @@ spec:
     cloud.google.com/compute-class: general-default
 ```
 
+## Validate before applying
+
+Run `kubectl apply --dry-run=server -f <file>.yaml` against the target cluster before applying. Server-side dry-run executes the same admission validation as a real apply (without persisting), so it catches:
+
+- Sysctl / kubelet keys outside the cluster's allowlist
+- Version-gated fields on a too-old control plane
+- `priorityDefaults.location` colliding with `Specific` reservations
+- Schema mismatches between the YAML and the installed CRD
+
+Client-side dry-run (`--dry-run=client`) only checks YAML well-formedness, not the CRD or admission rules — use server-side. If validation passes but the CCC still surfaces issues at runtime, check `status.conditions` (see [debug doc](./gke-compute-classes-debug.md)).
+
 ## Worked examples
 
 - **Stateful cache (Redis):** [`assets/redis-compute-class.yaml`](../assets/redis-compute-class.yaml) — kernel tuning (THP off, somaxconn), all-Gen-4 disk-gen lock-in, family-axis fallback (c4d → c4 → n4) on Hyperdisk.
 - **Stateful primary DB (Postgres):** [`assets/postgres-primary-compute-class.yaml`](../assets/postgres-primary-compute-class.yaml) — single-zone pin for zonal PV affinity, `reservations.affinity: Specific` on the top priority, On-Demand floor, `vm.overcommit_memory: 2` for OOM-killer safety.
 - **Stateful broker (Kafka):** [`assets/kafka-broker-compute-class.yaml`](../assets/kafka-broker-compute-class.yaml) — multi-zone, `localSSDCount: 2` for page cache, `vm.max_map_count` and `fs.file-max` raised for many-segment workloads, Hyperdisk durable boot.
-- **Stateless, Spot-cost-optimized (nginx and similar):** [`assets/nginx-spot-hunt-compute-class.yaml`](../assets/nginx-spot-hunt-compute-class.yaml) — Spot-first hunt across mixed-generation families ordered by us-central1 cost, with `activeMigration` to drift back to cheaper Spot and an On-Demand floor at the bottom.
+- **Stateless, disruption-tolerant Spot tier (serving + batch):** [`assets/spot-cost-tiebreak-compute-class.yaml`](../assets/spot-cost-tiebreak-compute-class.yaml) — Spot-first **cost tie-break** for workloads that tolerate preemption (web serving, batch jobs, async processors): three equal-score Spot families (`e2`, `n2d`, `n4`) at the top let CCC pick the lowest-cost-available among them rather than baking a family ordering into YAML that would rot as Spot pricing shifts. `activeMigration` drifts replicas back from the OD floor when Spot returns — good for serving, drop the block for long-running batch to avoid mid-job restarts. On-Demand floor at score 10. Requires GKE 1.35.2-gke.1842000+.
 - **GenAI inference (G4 / RTX PRO 6000 Blackwell):** [`assets/genai-inference-g4-compute-class.yaml`](../assets/genai-inference-g4-compute-class.yaml) — accelerator obtainability chain tuned for serving latency: reservation → Spot → DWS FlexStart → On-Demand. Note the Spot-before-DWS inversion vs. training-style chains (DWS's 3-min queue is unacceptable for online serving).
 - **Shared GPU inference (L4 with MPS):** [`assets/shared-l4-inference-compute-class.yaml`](../assets/shared-l4-inference-compute-class.yaml) — multi-tenant low-utilization inference with `gpuSharing.sharingStrategy: MPS` and `maxSharedClientsPerGPU: 4`. Single- and dual-GPU shapes for bin-packing flexibility.
+- **TPU v5e training:** [`assets/tpu-v5e-training-compute-class.yaml`](../assets/tpu-v5e-training-compute-class.yaml) — Reservation → On-Demand → Spot for training, with `tpu.type: tpu-v5-lite-podslice`, `count: 8`, `topology: 2x4`. Spot sits below On-Demand because preemption mid-step forces a checkpoint restart; for cost-tolerant batch retries, accept the trade-off. Single-zone since TPU reservations are zonal.
 - **Equal-priority tie-breaking (`priorityScore`):** [`assets/equal-priority-tiebreak-compute-class.yaml`](../assets/equal-priority-tiebreak-compute-class.yaml) — stateless web tier with three Gen-4 families tied at score 100, two Gen-2 fallbacks tied at 50, and an e2 floor at 10. Demonstrates the **3-rules-per-score cap**, "all priorities need a score if any do" rule, and unit-cost tie-break. Requires GKE 1.35.2-gke.1842000+.
 - **Manual-pool tie-breaking (`nodepools:` list):** [`assets/manual-pool-tiebreak-compute-class.yaml`](../assets/manual-pool-tiebreak-compute-class.yaml) — Standard-cluster hybrid pinning to three equal On-Demand zonal pools, then two equal Spot pools, then a NAC intent-based floor. Multiple pools listed in one priority are all eligible; autoscaler tie-breaks by unit cost.
 
 ## Selecting a CCC
 
 - **Per workload:** `nodeSelector: { cloud.google.com/compute-class: <name> }` or matching `affinity`.
-- **Namespace default:** label the namespace with `cloud.google.com/default-compute-class=<name>`.
-- **Cluster default:** mark a single CCC as cluster-wide default in its spec.
+- **Namespace default:** label the namespace — `kubectl label namespaces <NS> cloud.google.com/default-compute-class=<name>`. Use `cloud.google.com/default-compute-class-non-daemonset=<name>` to exclude DaemonSets.
+- **Cluster default:** two-part — (1) enable the feature on the cluster: `gcloud container clusters update <CLUSTER> --location <LOC> --enable-default-compute-class`, and (2) create a ComputeClass whose `metadata.name` is exactly `default`. There is no per-CCC "is-default" spec field; the literal name `default` is what GKE recognizes.
 
 > **Gotcha:** Don't combine CCC selection with other hard node selectors like `cloud.google.com/gke-spot` or `cloud.google.com/machine-family` — that creates scheduling conflicts. Express those constraints inside the CCC instead.
 
 > **Gotcha (stateful workloads):** Disk generation is a *create-time* constraint that's painful to fix later. Gen 4 VMs (`n4`, `c4`, `c4a`, `c4d`) require **Hyperdisk**; Gen 2 VMs (`n2`, `n2d`, `c2`, `c2d`, `m1`, `m2`) require **Persistent Disk**. If your workload has attached PVs, every priority in the list must use the same disk generation as those PVs — otherwise volume attach fails on the wrong-gen fallback. Boot disks aren't affected. Set `storage.bootDiskType` explicitly per priority (or in `priorityDefaults`) to make this intent visible. See [gke-compute-classes-debug.md](./gke-compute-classes-debug.md) for symptoms.
 
 > **Gotcha (Specific reservation + location):** Don't set `priorityDefaults.location` when any priority uses `reservations.affinity: Specific`. The default propagates to the reservation priority and conflicts with the reservation's own zonal scope, surfacing as `compute-class <name> contains priorities using location config with specific reservations enabled`. Fix: omit `priorityDefaults.location` and instead (a) set `reservations.specific[].zones` on the reservation priority to scope it to the reservation's actual zone(s), and (b) set `location.zones` per-priority on the non-reservation entries. This rule applies to per-priority `location` on a Specific-reservation priority too — not just the default.
+
+> **Reservation blocks:** When a Specific reservation has been partitioned into named blocks, set `reservations.specific[].reservationBlock.name` to consume from a particular block. Plain (non-partitioned) reservations omit this field. Sub-fields of `reservations.specific[]`: `name` (required), `zones`, `project` (cross-project reservations), and `reservationBlock`.
 
 ## Where to go next
 

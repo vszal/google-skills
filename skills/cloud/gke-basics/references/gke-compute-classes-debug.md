@@ -4,7 +4,7 @@ Triage CCC config errors, scale-up failures, and scheduling conflicts. For autho
 
 ## Always check first: GKE version vs. feature requirements
 
-Many CCC fields are gated on a minimum GKE control plane / node version. If a field appears to be **silently ignored**, accepted but never honored, or surfaces a "field not supported" error in `status.conditions`, the cluster is likely below the version that introduced it. Examples that have shipped at different times: `priorityScore` (1.35.2+), `activeMigration`, `flexStart`, `podFamily`, `confidentialNodeType`, certain `nodeSystemConfig` keys, and Hyperdisk options.
+Many CCC fields are gated on a minimum GKE control plane / node version. If a field appears to be **silently ignored**, accepted but never honored, or surfaces a "field not supported" error in `status.conditions`, the cluster is likely below the version that introduced it. Examples that have shipped at different times: `priorityScore` (1.35.2-gke.1842000+), `activeMigration`, `flexStart`, `podFamily`, `confidentialNodeType`, certain `nodeSystemConfig` keys, and Hyperdisk options.
 
 Verify against the source of truth before assuming a config bug:
 
