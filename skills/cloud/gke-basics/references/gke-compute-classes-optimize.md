@@ -53,6 +53,21 @@ For latency-sensitive workloads, put manual or pre-warmed pools at the top of th
 - **`AnyBestEffort` / "ANY" reservation affinity** has a hidden trap: it falls back to On-Demand at the **GCE level**, bypassing CCC — so your lower-priority CCC entries are never tried. Avoid unless you actually want that.
 - **Disk generation constraints (stateful workloads):** Gen 4 VMs require Hyperdisk; Gen 2 require Persistent Disk. Don't mix Gen 4 and Gen 2 in priority lists for workloads with attached PVs. Boot disks aren't affected.
 
+## Flexible CUDs and ComputeClass
+
+[Compute Flexible CUDs (FlexCUDs)](https://docs.cloud.google.com/compute/docs/instances/committed-use-discounts-overview#spend_based) are spend-based commitments that pair naturally with CCC priority lists: the discount is billing-account-wide and machine-series / region / project portable, so it follows whichever family the autoscaler ends up picking from your fallback list. A *resource-based* CUD locks back to a single shape and undermines the family-spread that gives a CCC its obtainability.
+
+**Coverage:**
+- ✅ vCPU, memory, local SSD on `C3`, `C3D`, `C4`, `C4A`, `C4D`, `E2`, `N1`, `N2`, `N2D`, `N4`, `N4D`, `N4A`, `H3`, `H4D`, `C2`, `C2D`, `Z3`.
+- **28% (1-yr) / 46% (3-yr)** on the general-purpose / compute-optimized series above; **17% / 38%** on `H3` / `H4D`.
+- ❌ Not covered: GPUs, TPUs, Hyperdisk, Persistent Disk.
+- ⚠ **M-series (`M1`–`M4`): 0% discount on 1-year**, 63% on 3-year — only 3-year is worth buying for memory-optimized.
+- ⚠ Spot is not documented as eligible — assume Spot priorities sit outside FlexCUD coverage.
+
+**Where the discount lands in a CCC:** the **On-Demand floor** is the highest-leverage spot for FlexCUDs to apply. Reservation priorities are already pre-paid, DWS is short-lived, and Spot has its own pricing — none of those benefit from a FlexCUD. For accelerator priorities, FlexCUDs cover only the host vCPU / memory portion of the instance — not the GPU or TPU itself; accelerator economics still come through reservations.
+
+**Family-spread tie-break tiers** (`priorityScore` with mixed eligible families) get the discount whichever family wins the tie-break — so don't constrain a spread to chase a resource-based CUD.
+
 ## Consolidation (scale-down)
 
 `spec.autoscalingPolicy` controls how aggressively under-utilized nodes are removed.
