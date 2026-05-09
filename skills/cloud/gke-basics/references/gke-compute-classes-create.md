@@ -8,7 +8,7 @@ Authoring a ComputeClass (CCC): concepts, CRD basics, and starter examples. For 
 
 - Declarative node configuration + autoscaling priorities for GKE Autopilot, or Standard with NodePoolAutoCreation (NAC) and/or manually created node pools.
 - Platform-level abstraction: shields app teams from infra details in podSpecs. Multiple CCCs per cluster; selected via nodeSelector/affinity, or as namespace/cluster default.
-- Common landing spot for users migrating from [Karpenter](https://karpenter.sh).
+- Common landing spot for users migrating from [Karpenter](https://karpenter.sh) — see [gke-compute-classes-karpenter-migration.md](./gke-compute-classes-karpenter-migration.md) for the concept-mapping reference (NodePool → CCC, weight → priority order, drift → activeMigration, etc.).
 
 ## Two ways to declare priorities
 
@@ -78,7 +78,7 @@ Common top-level fields:
 | `priorities[]` | Ordered list of provisioning attempts |
 | `autoscalingPolicy` | Consolidation thresholds + delay |
 | `activeMigration` | Drift workloads back to higher priorities (see optimize doc) |
-| `whenUnsatisfiable` | What happens when no priority is satisfiable. **Default: `DoNotScaleUp`** — appropriate for most workloads, since they have specific shape/accelerator/zone requirements. Set `ScaleUpAnyway` only when the workload genuinely accepts any-VM fallback (e.g. stateless web tier with HPA replicas). |
+| `whenUnsatisfiable` | What happens when no priority is satisfiable. **Default: `DoNotScaleUp`** — appropriate for most workloads, since they have specific shape/accelerator/zone requirements. Set `ScaleUpAnyway` only when the workload genuinely accepts any-VM fallback (e.g. stateless web tier with HPA replicas). **What `ScaleUpAnyway` actually picks**: on **Standard with NAC**, it provisions an **E2** node — hardcoded, not configurable, and a poor fit for memory-bound, latency-sensitive, or accelerator workloads. On **Autopilot**, GKE places the pod on any available node. If E2 isn't acceptable as a last resort, leave `whenUnsatisfiable` at the default and accept that pods stay `Pending` when no priority matches. |
 
 Common per-priority fields:
 

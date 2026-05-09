@@ -36,6 +36,7 @@ Load the relevant reference based on trigger keywords. Prefer the most specific 
 | Compute Classes — Create | create ComputeClass, define ComputeClass, CCC YAML, manual node pool binding, NAC vs manual | [gke-compute-classes-create.md](./references/gke-compute-classes-create.md) |
 | Compute Classes — Optimize | priority list, fallback, Spot strategy, GPU/TPU obtainability, consolidation, activeMigration, DWS FlexStart, FlexCUD, committed use discount, CUD | [gke-compute-classes-optimize.md](./references/gke-compute-classes-optimize.md) |
 | Compute Classes — Debug | ComputeClass status, scale-up failure, stockout, autoscaler visibility logs, scheduling conflict, pending pods | [gke-compute-classes-debug.md](./references/gke-compute-classes-debug.md) |
+| Compute Classes — Karpenter Migration | Karpenter, NodePool, EKS migration, drift, consolidationPolicy, instance-family translation, weight, disruption budgets | [gke-compute-classes-karpenter-migration.md](./references/gke-compute-classes-karpenter-migration.md) |
 | Cost | cost, savings, Spot VMs, rightsizing, CUD, optimize spend, budget | [gke-cost.md](./references/gke-cost.md) |
 | AI/ML Inference | inference, model serving, LLM, GPU, TPU, GIQ, vLLM | [gke-inference.md](./references/gke-inference.md) |
 | Upgrades | upgrade, maintenance window, release channel, patching, version | [gke-upgrades.md](./references/gke-upgrades.md) |

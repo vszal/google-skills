@@ -74,12 +74,14 @@ For latency-sensitive workloads, put manual or pre-warmed pools at the top of th
 
 ```yaml
 autoscalingPolicy:
-  consolidationDelayMinutes: 1        # how fast candidates are removed
+  consolidationDelayMinutes: 1        # how fast candidates are removed; 1 is the floor
   consolidationThreshold: 0           # CPU utilization threshold (0 = always)
   gpuConsolidationThreshold: 0        # accelerator utilization threshold
 ```
 
-Tune `consolidationDelayMinutes` upward for workloads that scale up/down frequently to avoid churn.
+Tune `consolidationDelayMinutes` upward for workloads that scale up/down frequently to avoid churn. **The minimum is 1 minute** — sub-minute consolidation (e.g. Karpenter's `consolidateAfter: 30s`) cannot be expressed; `1` is the floor.
+
+> **Cluster maintenance windows don't gate consolidation.** GKE's `--add-maintenance-exclusion-*` flags scope only **upgrades and node auto-repair**, not autoscaler scale-down. Consolidation runs continuously on its own clock regardless of maintenance windows. To suppress disruption during a quiet window, gate at the workload layer with a scheduled PDB tightening (CronJob toggling `maxUnavailable` to `0` and back) — there is no first-class CCC or cluster knob for time-windowed consolidation suppression.
 
 ## ActiveMigration
 
@@ -92,6 +94,17 @@ spec:
 ```
 
 > **Don't enable** for workloads that can't tolerate disruption.
+
+## Updating a ComputeClass
+
+Modifying a CCC's spec (priorities, sysctls, families, sizes, etc.) **does not retroactively change existing nodes**. They keep the configuration they were created with. Only **new** nodes created after the update use the new spec.
+
+What happens to running pods depends on `activeMigration`:
+
+- **Without `activeMigration`** (default): pods stay on their current nodes until they're rescheduled for some other reason (rollout, node drain, consolidation, Spot preemption). Old-spec nodes can persist indefinitely.
+- **With `activeMigration.optimizeRulePriority: true`**: the controller continuously drifts pods toward higher-priority rules. When a spec change introduces (or newly satisfies) a higher priority, drift replaces old-spec nodes with new-spec ones over time, throttled by any PDB on the workload. Note that activeMigration's trigger is "higher-priority capacity available," not "spec changed" directly — but the practical effect after a spec change is the same.
+
+If a CCC change must take effect immediately on running workloads (and you can tolerate the disruption), drain the affected nodes manually (`kubectl drain` — PDBs are honored). For workloads that can't tolerate disruption (training, stateful primaries), schedule the change at a maintenance window.
 
 ## Pattern 1 — Accelerator obtainability (GPU/TPU)
 
