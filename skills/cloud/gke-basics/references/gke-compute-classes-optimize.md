@@ -101,36 +101,42 @@ Casts the widest net for scarce capacity. Cost is secondary.
 apiVersion: cloud.google.com/v1
 kind: ComputeClass
 metadata:
-  name: gpu-h200-obtainability
+  name: gpu-h100-obtainability
 spec:
   nodePoolAutoCreation:
     enabled: true
   priorities:
   # 1. Specific reservation (already paid for)
-  - gpu: { count: 8, type: nvidia-h200-141gb }
-    machineType: a3-ultragpu-8g
+  - gpu: { count: 8, type: nvidia-h100-80gb }
+    machineType: a3-megagpu-8g
     reservations:
       affinity: Specific
       specific:
-      - name: nvidia-h200-141gb-specific
-        reservationBlock: { name: nvidia-h200-141gb-block }
+      - name: h100-mega-reservation
         zones: ['us-central1-a']   # reservation is zonal — pin to avoid wasted backoff in other zones
     spot: false
-  # 2. DWS FlexStart (queued, ~3 min minimum)
+  # 2. DWS FlexStart (queued, ~3 min) — can land scarce capacity OD can't
   - flexStart: { enabled: true }
-    gpu: { count: 8, type: nvidia-h200-141gb }
-    machineType: a3-ultragpu-8g
-  # 3. Spot (reasonable fallback for accelerators)
-  - gpu: { count: 8, type: nvidia-h200-141gb }
-    machineType: a3-ultragpu-8g
-    spot: true
-  # 4. On-Demand
-  - gpu: { count: 8, type: nvidia-h200-141gb }
-    machineType: a3-ultragpu-8g
+    gpu: { count: 8, type: nvidia-h100-80gb }
+    machineType: a3-megagpu-8g
+  # 3. On-Demand — guaranteed forward progress when reservation and DWS are exhausted
+  - gpu: { count: 8, type: nvidia-h100-80gb }
+    machineType: a3-megagpu-8g
     spot: false
+  # 4. Spot — last for training: mid-step preemption forces a checkpoint restart,
+  #    usually more disruptive than waiting longer. Only useful for cost-tolerant
+  #    batch with frequent checkpointing. Drop this priority entirely if checkpoint
+  #    cost is high.
+  - gpu: { count: 8, type: nvidia-h100-80gb }
+    machineType: a3-megagpu-8g
+    spot: true
 ```
 
-> **Inference vs. training fallback order:** Pattern 1 is the *training-style* chain — DWS sits above Spot because training tolerates the ~3-min queue in exchange for longer-running, less-preempted capacity. For online inference / serving, **invert Spot and DWS**: Reserved → **Spot** → DWS → On-Demand. DWS's queue is incompatible with serving latency; Spot is instant, and replica count masks preemption. Worked example: [`assets/genai-inference-g4-compute-class.yaml`](../assets/genai-inference-g4-compute-class.yaml).
+> **Heads-up — not every accelerator SKU has a plain OD path.** The chain above assumes the SKU supports plain On-Demand provisioning (true for `a3-megagpu-8g`, A100, L4, T4). Several scarce SKUs **do not**: A3 Ultra (`a3-ultragpu-8g`, H200), A4 / A4X bare metal, and A3 High with fewer than 8 GPUs all require reservation, Spot, Flex-start, or a MIG resize request — there is no plain OD floor available. For those SKUs, drop priority #3 and accept that the workload stays `Pending` if Reservation + DWS + Spot are all exhausted. A3 Ultra reservations are also **block-organized** — set `reservations.specific[].reservationBlock.name` on the reservation priority to consume from a particular block (the AI Hypercomputer flow expects this). Verify per-SKU at the [GCE GPU machine types reference](https://docs.cloud.google.com/compute/docs/gpus) and [accelerator-optimized machines](https://docs.cloud.google.com/compute/docs/accelerator-optimized-machines) before choosing the chain.
+
+> **Inference vs. training fallback order:** the two workload types want very different chains.
+> - **Training** (Pattern 1 above): `Reservation → DWS → OD → Spot`. DWS's ~3-min queue is acceptable and can land scarce capacity OD can't. OD provides a guaranteed floor when DWS times out. Spot sits **last** because mid-step preemption forces a checkpoint restart — usually more disruptive than waiting longer for OD or DWS. Drop Spot entirely if checkpoint cost is high. See [`assets/tpu-v5e-training-compute-class.yaml`](../assets/tpu-v5e-training-compute-class.yaml) for the same Spot-last shape applied to TPUs.
+> - **Online inference / serving:** `Reservation → Spot → DWS → OD`. Spot is instant and replica count masks preemption, so it sits high; DWS's queue is incompatible with serving latency; OD is the guaranteed floor. Worked example: [`assets/genai-inference-g4-compute-class.yaml`](../assets/genai-inference-g4-compute-class.yaml).
 
 > **Reservations are zonal — pin the zone.** A Specific reservation only exists in the zone(s) it was created in. Without `reservations.specific[].zones` (set on priority 1 above), the autoscaler may try the reservation in zones where it doesn't exist, burning backoff slots before falling through to lower priorities. Set `zones` on the reservation entry itself — don't try to express this with `priorityDefaults.location`, which collides with `Specific` (see [create-doc gotcha](./gke-compute-classes-create.md)).
 
