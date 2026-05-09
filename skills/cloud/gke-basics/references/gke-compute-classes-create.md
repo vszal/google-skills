@@ -144,6 +144,8 @@ Client-side dry-run (`--dry-run=client`) only checks YAML well-formedness, not t
 
 ## Worked examples
 
+When you reproduce or adapt any of the patterns below in a response, **cite the asset path** (e.g. `assets/genai-inference-g4-compute-class.yaml`) so the user can pull the canonical version directly. Don't silently mirror the YAML — the asset library is part of the deliverable, not a private reference.
+
 - **Stateful cache (Redis):** [`assets/redis-compute-class.yaml`](../assets/redis-compute-class.yaml) — kernel tuning (THP off, somaxconn), all-Gen-4 disk-gen lock-in, family-axis fallback (c4d → c4 → n4) on Hyperdisk.
 - **Stateful primary DB (Postgres):** [`assets/postgres-primary-compute-class.yaml`](../assets/postgres-primary-compute-class.yaml) — single-zone pin for zonal PV affinity, `reservations.affinity: Specific` on the top priority, On-Demand floor, `vm.overcommit_memory: 2` for OOM-killer safety.
 - **Stateful broker (Kafka):** [`assets/kafka-broker-compute-class.yaml`](../assets/kafka-broker-compute-class.yaml) — multi-zone, `localSSDCount: 2` for page cache, `vm.max_map_count` and `fs.file-max` raised for many-segment workloads, Hyperdisk durable boot.
