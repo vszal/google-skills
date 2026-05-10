@@ -82,6 +82,8 @@ Check, in order:
 
 Symptoms: idle nodes persist, cluster cost stays flat after traffic drops.
 
+For a one-shot scan of the four most common workload-side blockers (`safe-to-evict: false` annotations, bare pods, local-storage pods, tight PDBs), run [`assets/find-scale-down-blockers.sh`](../assets/find-scale-down-blockers.sh) — categorizes offenders so you can prioritize the fix. Pair with `log-autoscaler-events.sh` for the autoscaler's own per-node `noScaleDown.reason` codes.
+
 **Common causes:**
 
 - **`safe-to-evict: "false"` annotation** on a pod sitting on the node. Find offenders:
@@ -107,22 +109,10 @@ Symptom: a high-cost node (e.g. GPU/TPU host or large compute SKU) refuses to dr
 
 **Fix — segregate system pods into their own ComputeClass via a namespace default.** Label `kube-system` (and any other infra namespaces) with `cloud.google.com/default-compute-class-non-daemonset=<name>` so non-DaemonSet system pods land on a dedicated, cheap class. The `-non-daemonset` variant leaves DaemonSets alone (they'd otherwise need to run everywhere anyway). This creates automatic workload separation: expensive nodes only host actual workloads, and consolidation can drain them freely.
 
-```yaml
-apiVersion: cloud.google.com/v1
-kind: ComputeClass
-metadata:
-  name: system-pool
-spec:
-  nodePoolAutoCreation:
-    enabled: true
-  priorities:
-  - machineFamily: n4
-    minCores: 4
-  whenUnsatisfiable: ScaleUpAnyway   # never block kube-system
-```
+Full CCC: [`assets/system-pool-compute-class.yaml`](../assets/system-pool-compute-class.yaml). Apply and label:
 
 ```bash
-kubectl apply -f system-pool.yaml
+kubectl apply -f assets/system-pool-compute-class.yaml
 kubectl label namespace kube-system \
   cloud.google.com/default-compute-class-non-daemonset=system-pool
 ```
@@ -220,6 +210,10 @@ gcloud container node-pools describe <POOL> --cluster=<CLUSTER> --location=<LOC>
 
 # Errors-only, with file output
 ./assets/log-autoscaler-events.sh --errors-only --log-file errors.log <cluster-name>
+
+# One-shot scan for the 4 common workload-side scale-down blockers
+./assets/find-scale-down-blockers.sh
+./assets/find-scale-down-blockers.sh -n my-namespace
 
 # Last hour of visibility logs as JSON
 gcloud logging read 'log_id("container.googleapis.com/cluster-autoscaler-visibility")' \

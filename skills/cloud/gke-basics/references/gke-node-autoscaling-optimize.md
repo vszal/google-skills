@@ -135,7 +135,7 @@ Cluster autoscaler is reactive: when pending pods appear, it provisions nodes. F
 | Fixed | `replicas: <N>` | Constant warm capacity (e.g. always keep 3 GPU nodes ready) |
 | Dynamic | `percentage: <%>` + `scalableRef: <Deployment>` | Buffer scales with the workload (e.g. 20% headroom on top of current replicas). PodTemplate-only buffers can't use percentage. |
 
-**Example — fixed buffer for a serving CCC:**
+**Example — fixed buffer for a serving CCC** (full file: [`assets/capacity-buffer-serving.yaml`](../assets/capacity-buffer-serving.yaml), includes a dynamic-sizing alternative as commented overlay):
 
 ```yaml
 apiVersion: v1
