@@ -58,7 +58,7 @@ Inspect `resultInfo.results.errorMsg.messageId` — it tells you exactly which M
 | `scale.up.error.ip.space.exhausted` | Subnet IP exhaustion | Expand subnet / secondary range |
 | `scale.up.no.scale.up` | No priority matched | Check `whenUnsatisfiable` and pod requests |
 
-For a continuous live tail of the two relevant log shapes — `resultInfo.results.errorMsg` (per-MIG failures) and `noScaleUp.unhandledPodGroups` (per-pod rejections with `rejectedMigs[].reason.messageId`) — use [`assets/log-scale-errors.sh <cluster-name>`](../assets/log-scale-errors.sh). It polls every 10s, scopes the filter to a single cluster, color-prints to terminal, and appends to `errors.log`. Requires `gcloud` and `jq`. Useful when you're watching a CCC roll out and want to catch scale-up errors as they happen rather than scraping logs after the fact.
+For a continuous live tail of all autoscaler decisions — successful scale-ups, NAP node-pool creations, scale-downs, plus failures (`resultInfo.results.errorMsg`) and stalls (`noDecisionStatus.noScaleUp` / `noScaleDown`) — use [`assets/log-autoscaler-events.sh <cluster-name>`](../assets/log-autoscaler-events.sh). Polls every 10s, scopes the filter to one cluster, color-prints to terminal. Add `--errors-only` (or `-e`) to suppress successes, and `--log-file PATH` (or `-o PATH`) to also append plain text to a file. Requires `gcloud` and `jq`. Useful when you're watching a CCC roll out and want decisions surfaced as they happen.
 
 Also check standard Kubernetes events:
 

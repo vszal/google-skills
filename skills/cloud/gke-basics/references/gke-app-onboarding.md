@@ -153,7 +153,7 @@ kubectl get pods -l app=my-app
 ## Next Steps
 
 Once the application is running on GKE:
-- Configure autoscaling — see [gke-scaling.md](./gke-scaling.md)
+- Configure pod autoscaling — see [gke-workload-autoscaling.md](./gke-workload-autoscaling.md); for node autoscaling see [gke-node-autoscaling-enable.md](./gke-node-autoscaling-enable.md)
 - Set up observability — see [gke-observability.md](./gke-observability.md)
 - Harden security — see [gke-security.md](./gke-security.md)
 - Configure reliability (PDBs, topology spread) — see [gke-reliability.md](./gke-reliability.md)
