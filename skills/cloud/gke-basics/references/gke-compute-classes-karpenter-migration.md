@@ -1,6 +1,8 @@
 # GKE ComputeClasses: Migrating from Karpenter
 
-For teams moving from Karpenter (commonly EKS+Karpenter → GKE+ComputeClasses). The fundamentals — CRD shape, NAC vs. manual pools, the field tables — are in [gke-compute-classes-create.md](./gke-compute-classes-create.md). Priority list design and fallback patterns are in [gke-compute-classes-optimize.md](./gke-compute-classes-optimize.md). This doc focuses on the translation: what maps cleanly, what changes, what GKE doesn't have an equivalent for.
+For teams moving from Karpenter (commonly EKS+Karpenter → GKE+ComputeClasses). **Most of the concept mapping below also applies to legacy EKS cluster-autoscaler on managed node groups, AKS node pools (including AKS NAP / Karpenter-on-Azure), and OpenShift MachineSets** — substitute your source's term wherever this doc says "NodePool". Karpenter-specific items (`disruption.budgets` with schedules, `drift` semantics, `consolidateAfter` second-granularity) are flagged inline. The fundamentals — CRD shape, NAC vs. manual pools, the field tables — are in [gke-compute-classes-create.md](./gke-compute-classes-create.md). Priority list design and fallback patterns are in [gke-compute-classes-optimize.md](./gke-compute-classes-optimize.md). This doc focuses on the translation: what maps cleanly, what changes, what GKE doesn't have an equivalent for.
+
+> **"NAP" is overloaded across clouds.** **AKS NAP** (Azure Node Auto-Provisioning) is Karpenter-on-Azure — a per-NodePool CRD with the Karpenter API surface. **GKE NAP** (Node Auto-Provisioning) is the cluster-wide auto-provisioner with global resource caps — a different mechanism. The closest GKE analog to AKS NAP NodePools is a **CCC with `nodePoolAutoCreation.enabled: true`** (NAC), not GKE NAP. See [gke-node-autoscaling-enable.md](./gke-node-autoscaling-enable.md) for GKE NAP vs. NAC.
 
 ## Concept mapping
 

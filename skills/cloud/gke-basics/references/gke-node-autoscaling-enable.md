@@ -18,6 +18,8 @@ Turning on node-level scaling: cluster autoscaler (CA) on a pool, Node Auto-Prov
 
 > **Autopilot:** CA, NAP, and node management are always on and managed by GKE. The flags below apply to **Standard** clusters. Autopilot users still get the most leverage from ComputeClasses for fallbacks and per-class tuning.
 
+> **"NAP" is overloaded across clouds.** GKE NAP (above) is the cluster-wide auto-provisioner. **AKS NAP** (Azure) is Karpenter-on-Azure — a per-NodePool CRD with a different API surface and configuration model. Map AKS NAP NodePools to a GKE **CCC with `nodePoolAutoCreation.enabled: true`**, not to GKE NAP. See [Karpenter migration](./gke-compute-classes-karpenter-migration.md) for the field-by-field translation.
+
 ## Cluster autoscaler on a node pool
 
 Resizes a pool between `--min-nodes` and `--max-nodes` based on pending pods (scale-up) and node utilization (scale-down). Operates per pool — each pool has its own `[min, max]`.

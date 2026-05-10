@@ -136,6 +136,53 @@ Symptoms: empty manual pool stays at 1 node.
 - **Switch to Autopilot** if pod-billed pricing is acceptable. Autopilot bills per-pod resources, so a cluster with no running workloads costs $0 — no node management at all, and the scale-to-zero question disappears. Especially fitting for dev/test clusters that idle on weekends. See [core-concepts.md](./core-concepts.md) for Autopilot vs Standard tradeoffs.
 - Accept the floor — set `--min-nodes=1` and live with one idle node when demand is zero.
 
+## Spot preemption — graceful shutdown signal
+
+EKS and AKS migrants commonly ask whether GKE needs an [AWS Node Termination Handler](https://github.com/aws/aws-node-termination-handler)-style DaemonSet to drain Spot nodes on the preemption notice. **It does not** — kubelet handles this directly. Symptoms that send people here: pods on Spot nodes appearing to die abruptly, `terminationGracePeriodSeconds` not honored on Spot, or migration parity worries.
+
+**Default behavior.** When GCE preempts a Spot VM, the metadata server sets `preempted=TRUE` and an ACPI shutdown signal follows. On GKE, kubelet starts a node-wide graceful shutdown when it sees the signal — a **30-second** window by default — sending SIGTERM to each pod (longest `terminationGracePeriodSeconds` first) and waiting for them to exit before the node terminates. No DaemonSet required.
+
+**Recommended: opt into the 120-second extended grace period** (GKE 1.35.0-gke.1171000+, Standard only, currently Preview). The graceful-shutdown duration is set in the [kubelet system config](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/node-system-config); allowed values are `0`, `30`, or `120` seconds. **For any Spot pool, prefer 120s** — it gives kubelet the maximum window to drain pods and run `preStop` hooks before the node disappears, at no cost when no preemption is happening.
+
+```yaml
+# system-config.yaml
+kubeletConfig:
+  shutdownGracePeriodSeconds: 120
+  shutdownGracePeriodCriticalPodsSeconds: 15   # reserved for system pods
+```
+
+Apply per node pool on create or update:
+
+```bash
+gcloud container node-pools create my-spot-pool \
+  --cluster=my-cluster --location=us-central1 \
+  --spot \
+  --system-config-from-file=system-config.yaml
+
+# Or on an existing pool
+gcloud container node-pools update my-spot-pool \
+  --cluster=my-cluster --location=us-central1 \
+  --system-config-from-file=system-config.yaml
+```
+
+**Pod-side knobs.**
+- `terminationGracePeriodSeconds` on the pod is **capped** by the kubelet's `shutdownGracePeriodSeconds`. A pod with TGPS=300 on a node with kubelet=120 gets 120.
+- Use `preStop` hooks for cleanup work (drain connections, flush buffers) — they run inside the grace window.
+
+**EKS migrant notes.**
+- AWS Spot Interruption Notice is 2 min; GKE default is 30s; opt-in extended is 120s. Workloads designed around the AWS 2-min window need to either tolerate a shorter notice or run on a pool with the extended grace enabled.
+- AWS Node Termination Handler has no GKE counterpart and isn't needed.
+
+**Caveats.**
+- Standard mode only. Autopilot manages Spot termination internally — the kubelet system config surface isn't exposed there.
+- The `kubeletConfig.shutdownGracePeriodSeconds` field is not necessarily in the [ComputeClass `nodePoolConfig.kubeletConfig` allowlist](https://docs.cloud.google.com/kubernetes-engine/docs/reference/crds/computeclass) at time of writing. Verify against the live CRD reference before relying on it from a CCC; if it isn't listed, configure on a manual pool bound to the CCC via `nodepools: [...]` and let NAC fall through.
+- The Compute Engine [`preemptionNoticeDuration`](https://docs.cloud.google.com/compute/docs/instances/spot) flag (`--preemption-notice-duration=120s` on raw VMs) governs the metadata-signal-to-ACPI window — **a separate concept** from the kubelet's pod-drain grace. On GKE, the kubelet `shutdownGracePeriodSeconds` is the operative knob; you don't need (and can't easily set) the CE-level preemption notice on GKE-managed nodes.
+
+See:
+- [GKE Spot VMs concepts](https://docs.cloud.google.com/kubernetes-engine/docs/concepts/spot-vms)
+- [Customize node system configuration](https://docs.cloud.google.com/kubernetes-engine/docs/how-to/node-system-config)
+- [Compute Engine Spot preemption notice (Preview)](https://docs.cloud.google.com/compute/docs/instances/spot)
+
 ## Backoff loops at the top of a CCC priority list
 
 Symptom: lower priorities never get tried; pods stay Pending despite obtainable shapes lower in the list.
