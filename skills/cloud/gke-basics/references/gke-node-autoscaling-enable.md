@@ -28,8 +28,9 @@ Resizes a pool between `--min-nodes` and `--max-nodes` based on pending pods (sc
 
 **Caveats:**
 - 15,000-node cluster cap.
-- Standard CA cannot scale a manual pool to **zero** — must keep ≥1 node. Only NAC-managed pools can be deleted entirely when empty.
+- Standard CA cannot scale a manual pool to **zero** — must keep ≥1 node. Only NAC-managed pools can be deleted entirely when empty. (Autopilot sidesteps this question entirely — pod-billed pricing means $0 idle.)
 - `--total-min-nodes` / `--total-max-nodes` set a *cluster-total* cap across zones (1.24+) — alternative to per-zone `--min-nodes` / `--max-nodes`.
+- **`--total-max-nodes` caps the pool it's set on, not the cluster.** There is **no cluster-wide node-count cap** — cluster size is bounded indirectly by NAP `--max-cpu` / `--max-memory` / `--max-accelerator` divided by the smallest fitting shape, plus the sum of per-pool `--max-nodes` for manual pools. NAC-created pools each have their own autoscaler-managed max within the cluster-wide NAP caps.
 
 **Enable on a new pool:**
 
@@ -132,13 +133,25 @@ spec:
 
 For the full CCC authoring surface (CRD fields, manual-pool binding, selecting a class) see [gke-compute-classes-create.md](./gke-compute-classes-create.md).
 
+## Cutover: cluster-wide NAP → CCC-scoped NAC
+
+Common migration on existing clusters: cluster-wide NAP has been managing pool creation for a while; you want to introduce per-workload CCCs (different shape/fallback rules per class) without disruption. Order of operations:
+
+1. **Apply CCCs.** `kubectl apply -f <ccc>.yaml` for each class with `nodePoolAutoCreation.enabled: true` and the priority list you want. On GKE 1.33.3-gke.1136000+ this works without cluster NAP enabled, but leaving NAP on during cutover is fine and gives you a safety net.
+2. **Opt workloads in.** Either per-pod (`nodeSelector: cloud.google.com/compute-class: <name>`), per-namespace (`kubectl label namespaces <ns> cloud.google.com/default-compute-class=<name>`), or cluster-wide via the `default` CCC. New pods land on CCC-managed nodes; existing nodes don't migrate automatically.
+3. **Drain old NAP-managed pools.** For each pool you want gone, `kubectl drain <node>` (one node at a time, respecting PDBs) or `gcloud container node-pools delete <pool>` once empty. Or rely on natural turnover (rolling restarts, preemptions) to drift workloads onto the new CCC nodes — slower but no manual disruption.
+4. **Verify.** `kubectl get nodes -L cloud.google.com/compute-class` should show every node tagged with the expected class.
+5. **Decide on cluster NAP.** Keep it enabled if you need cluster-wide caps on CPU/memory/accelerators (those don't live in any CCC). Disable it (`gcloud container clusters update <c> --no-enable-autoprovisioning`) if you don't — cleaner mental model and the CCC-scoped NAC fully replaces it for shape decisions.
+
+> **Existing nodes don't drift to new CCCs.** Step 3 is the part most easily skipped. After steps 1–2 you'll have a cluster where new pods land on CCC nodes but old NAP nodes hang around indefinitely (their pods are running and eviction isn't triggered). The cutover isn't complete until those nodes are drained or naturally turn over.
+
 ## Choosing manual pools, NAC, or hybrid
 
 | Approach | Strengths | Weaknesses | When to pick |
 |----------|-----------|------------|--------------|
 | **Manual pools only** | Stable names (eligible for `nodepools: [...]` pinning); fast scheduling (no pool-creation latency) | Limited to pre-provisioned shapes; obtainability brittle on stockout | Latency-sensitive serving with stable shape; pools you need to inspect/manage by name |
 | **NAC only (CCC)** | Best obtainability — GKE tries multiple shapes; no idle pools when demand is zero | Pool-creation latency on each new shape; ephemeral pool names (no `nodepools: [...]` refs) | Bursty workloads; broad fallback chains; cost-sensitive batch |
-| **Hybrid (preferred)** | Manual pool at the top of the priority list for the fast path; NAC fallbacks below for obtainability | Slightly more to manage | Most production workloads — see Pattern 3 in [gke-compute-classes-optimize.md](./gke-compute-classes-optimize.md) |
+| **Hybrid (preferred)** | Manual pool at the top of the priority list for the fast path; NAC fallbacks below for obtainability | Slightly more to manage | Most production workloads — see Pattern 3 in [gke-compute-classes-optimize.md](./gke-compute-classes-optimize.md). If pending-pod latency on traffic spikes is also a concern, layer a [Capacity Buffer](./gke-node-autoscaling-optimize.md#capacity-buffers--pre-warm-capacity-for-faster-scale-up) on top of the hybrid CCC. |
 
 See the [create doc's NAC vs. manual section](./gke-compute-classes-create.md#nac-vs-manual-node-pools-provisioning-source) for the full comparison and the bind-with-label/taint pattern for manual pools.
 

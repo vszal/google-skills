@@ -142,7 +142,8 @@ Symptoms: empty manual pool stays at 1 node.
 **Cause:** Standard cluster autoscaler does not delete the last node of a manual pool. Only **NAC-managed** pools can be removed entirely when empty (the autoscaler created them, so it can also delete them).
 
 **Fix options:**
-- Switch to a CCC with `nodePoolAutoCreation.enabled: true` so the pool is NAC-managed and ephemeral.
+- Switch to a CCC with `nodePoolAutoCreation.enabled: true` so the pool is NAC-managed and ephemeral. NAC will scale the pool to zero (and remove it entirely) when no pods are pending.
+- **Switch to Autopilot** if pod-billed pricing is acceptable. Autopilot bills per-pod resources, so a cluster with no running workloads costs $0 — no node management at all, and the scale-to-zero question disappears. Especially fitting for dev/test clusters that idle on weekends. See [core-concepts.md](./core-concepts.md) for Autopilot vs Standard tradeoffs.
 - Accept the floor — set `--min-nodes=1` and live with one idle node when demand is zero.
 
 ## Backoff loops at the top of a CCC priority list

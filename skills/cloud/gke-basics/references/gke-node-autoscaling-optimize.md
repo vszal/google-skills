@@ -47,9 +47,9 @@ spec:
 ```
 
 **Field semantics:**
-- `consolidationDelayMinutes`: how long a node must remain a consolidation candidate before it's actually removed. Higher = less churn; lower = faster cost recovery. **Minimum is 1** — sub-minute consolidation (e.g. Karpenter's `consolidateAfter: 30s`) cannot be expressed.
-- `consolidationThreshold`: CPU-utilization threshold. A node below this for the delay window becomes a candidate. `0` ≈ "always a candidate when reschedulable" (most aggressive); higher values protect partially-loaded nodes.
-- `gpuConsolidationThreshold`: same shape for GPU utilization on accelerator nodes. Tune separately because GPU bin-packing dynamics differ from CPU.
+- `consolidationDelayMinutes`: how long a node must remain a consolidation candidate before it's actually removed. Higher = less churn; lower = faster cost recovery. **Minimum is 1** — sub-minute consolidation (e.g. Karpenter's `consolidateAfter: 30s`) cannot be expressed. Documented range is `1–1440` minutes.
+- `consolidationThreshold`: CPU-utilization threshold, range `0–100`. A node becomes a consolidation candidate when its utilization is **below** this value. `0` is a special-case maximum-aggression value — nodes are always candidates regardless of utilization. For non-zero values, **lower = stricter** (only very-idle nodes qualify → more protection for partially-loaded nodes), **higher = looser** (more nodes qualify → more aggressive consolidation). For batch / dev-test set `0`; for serving leave low (the "stricter" direction).
+- `gpuConsolidationThreshold`: same shape for GPU utilization on accelerator nodes. The CRD reference recommends setting this to `0` (always consolidate) or close to it for most workloads — partial-GPU utilization rarely justifies keeping a node alive. Tune separately from CPU because GPU bin-packing dynamics differ.
 
 > **Disruption controls — what consolidation honors.** Both bin-packing consolidation (cost-driven repacking onto fewer nodes) and under-utilization consolidation respect:
 > - **PodDisruptionBudgets** — a node is skipped if eviction would breach a PDB.
@@ -174,6 +174,7 @@ spec:
 
 **When to use:**
 - Burst-sensitive serving with strict pod-pending SLOs.
+- **HPA scale-up outpaces cluster autoscaler** — pods spike from 10 → 200 replicas faster than CA can provision nodes; without warm capacity, the new pods sit `Pending` for the CA round-trip (often 60–120s including NAC pool creation).
 - Pre-warming GPU/TPU capacity ahead of a known traffic window.
 - Workloads where NAC pool-creation latency is unacceptable on the fast path.
 
@@ -183,6 +184,8 @@ spec:
 - Custom scalable resource references — those need a manual RBAC grant for the cluster autoscaler.
 
 > **Reaction lag.** Buffer recalculation against the source workload has up to ~5 min latency. For sub-minute traffic ramps, a fixed buffer matched to peak demand is more predictable than a percentage buffer chasing the workload.
+
+> **Time-windowed ramps (e.g. weekday business hours).** Neither sizing mode handles a *predictable-time* ramp gracefully on its own: a fixed buffer at peak demand pays for warm capacity overnight, and a dynamic percentage buffer lags the ramp by ~5 min so you miss the front of it. Pair the dynamic buffer with a **scheduled scaler on the source workload** (KEDA cron scaler, scheduled HPA via external metric, or a CronJob patching the source `replicas`) — the source scales up before the ramp, the buffer follows. For fixed buffers, schedule a CronJob to patch `spec.replicas` on the `CapacityBuffer` ahead of each window. See [gke-workload-autoscaling.md](./gke-workload-autoscaling.md) for HPA scheduling patterns.
 
 > **Buffer vs. `min-nodes`.** A pool floor (`--min-nodes` or `--total-min-nodes`) is the dumbest version of "warm capacity" — it pins a fixed count of nodes regardless of workload. Capacity Buffers are richer: they target a specific ComputeClass, pair with a pod shape (so NAC knows what to provision), and can scale dynamically. Use buffers for shape-aware warm capacity; use pool floors only when you genuinely need a baseline node count for the pool's own workloads (e.g. a system pool).
 
